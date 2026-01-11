@@ -4,12 +4,13 @@ import { motion, useScroll, useTransform, useSpring } from "framer-motion"
 export default function SneakerScroll() {
   const containerRef = useRef(null)
   const canvasRef = useRef(null)
-  
+
   const frameCount = 240
   const images = useRef([])
   const [imagesLoaded, setImagesLoaded] = useState(0)
+  const [currentFolder, setCurrentFolder] = useState(null)
 
-  // 1. Scroll & Animation Logic
+  // 1. Scroll Control
   const { scrollYProgress } = useScroll({
     target: containerRef,
     offset: ["start start", "end end"]
@@ -19,90 +20,97 @@ export default function SneakerScroll() {
   const frame = useSpring(rawFrame, { stiffness: 70, damping: 30, mass: 1 })
   const canvasOpacity = useTransform(scrollYProgress, [0.9, 1], [1, 0])
 
-  // 2. Preload Images
-  useEffect(() => {
-    for (let i = 1; i <= frameCount; i++) {
-      const img = new Image()
-      img.src = `/frames/ezgif-frame-${String(i).padStart(3, "0")}.jpg`
-      img.onload = () => {
-        images.current[i - 1] = img
-        setImagesLoaded(prev => prev + 1)
-      }
-    }
-  }, [])
+  // 2. FIXED PRELOADER (Detects PNG vs JPG)
+  const loadImages = (folderName) => {
+    if (currentFolder === folderName) return;
+    
+    setCurrentFolder(folderName);
+    images.current = [];
+    setImagesLoaded(0);
 
-  // 3. Updated Render Loop (MOBILE FIX INCLUDED)
+    // FIX: Your mobile frames are .png, desktop are .jpg
+    const extension = folderName === "frames-mobile" ? "png" : "jpg";
+
+    for (let i = 1; i <= frameCount; i++) {
+      const img = new Image();
+      img.src = `/${folderName}/ezgif-frame-${String(i).padStart(3, "0")}.${extension}`;
+      
+      img.onload = () => {
+        images.current[i - 1] = img;
+        setImagesLoaded(prev => prev + 1);
+      };
+      img.onerror = () => {
+        // Fallback check: if png fails, try jpg
+        if (img.src.endsWith(".png")) {
+           img.src = img.src.replace(".png", ".jpg");
+        }
+      };
+    }
+  };
+
   useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext("2d")
+    const handleCheckMode = () => {
+      const isMobile = window.innerWidth < 768;
+      const targetFolder = isMobile ? "frames-mobile" : "frames";
+      loadImages(targetFolder);
+    };
+
+    handleCheckMode();
+    window.addEventListener("resize", handleCheckMode);
+    return () => window.removeEventListener("resize", handleCheckMode);
+  }, [currentFolder]);
+
+  // 3. Render Loop
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
 
     const render = () => {
-      const currentIndex = Math.round(frame.get())
-      const img = images.current[currentIndex]
-      if (!img) return
+      const index = Math.round(frame.get());
+      const img = images.current[index];
+      if (!img) return;
 
-      const dpr = window.devicePixelRatio || 1
-      const width = window.innerWidth
-      const height = window.innerHeight
+      const dpr = window.devicePixelRatio || 1;
+      const width = window.innerWidth;
+      const height = window.innerHeight;
 
-      // Sync canvas resolution to screen resolution
       if (canvas.width !== width * dpr) {
-        canvas.width = width * dpr
-        canvas.height = height * dpr
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
       }
 
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // --- RESPONSIVE SCALE LOGIC ---
-      let scale;
-      if (width < 768) {
-        // MOBILE: Scale to fit width so sides aren't cut off
-        // 0.85 keeps the shoe large but leaves a small margin
-        scale = (canvas.width / img.width) * 0.85;
-      } else {
-        // DESKTOP: Original immersive cover logic
-        scale = Math.max(canvas.width / img.width, canvas.height / img.height);
-      }
+      const scale = Math.max(canvas.width / img.width, canvas.height / img.height);
+      const x = canvas.width / 2 - (img.width * scale) / 2;
+      const y = canvas.height / 2 - (img.height * scale) / 2;
 
-      const x = (canvas.width / 2) - (img.width * scale) / 2
-      const y = (canvas.height / 2) - (img.height * scale) / 2
+      ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+    };
 
-      ctx.drawImage(img, x, y, img.width * scale, img.height * scale)
-    }
-
-    if (imagesLoaded > 0) render()
-    const unsubscribe = frame.on("change", render)
-    window.addEventListener("resize", render)
-
-    return () => {
-      unsubscribe()
-      window.removeEventListener("resize", render)
-    }
-  }, [imagesLoaded, frame])
+    if (imagesLoaded > 0) render();
+    const unsub = frame.on("change", render);
+    return () => unsub();
+  }, [imagesLoaded, frame]);
 
   return (
     <div ref={containerRef} className="relative h-[450vh] bg-[#050505] text-white overflow-x-hidden font-sans">
       
-      {/* 4. Cinematic Overlay (Vignette) */}
       <div className="fixed inset-0 pointer-events-none z-10 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.5)_100%)]" />
 
-      {/* 5. Loading Bar */}
       {imagesLoaded < frameCount && (
         <div className="fixed top-0 left-0 h-[2px] bg-white z-[60] transition-all duration-300 shadow-[0_0_10px_#fff]" 
              style={{ width: `${(imagesLoaded / frameCount) * 100}%` }} />
       )}
 
-      {/* 6. The Canvas */}
       <motion.canvas
         ref={canvasRef}
         style={{ opacity: canvasOpacity }}
         className="fixed inset-0 w-full h-full pointer-events-none z-0"
       />
 
-      {/* 7. Enhanced UI Overlays */}
       <div className="relative z-20">
-        
         {/* Section 1: Hero */}
         <motion.section 
           style={{ 
@@ -120,7 +128,7 @@ export default function SneakerScroll() {
           </div>
         </motion.section>
 
-        {/* Section 2: Technical Detail 1 */}
+        {/* Section 2: Detail 1 */}
         <motion.section 
           style={{ opacity: useTransform(scrollYProgress, [0.25, 0.35, 0.45], [0, 1, 0]) }}
           className="h-screen flex items-center px-8 md:px-32"
@@ -134,7 +142,7 @@ export default function SneakerScroll() {
           </div>
         </motion.section>
 
-        {/* Section 3: Technical Detail 2 */}
+        {/* Section 3: Detail 2 */}
         <motion.section 
           style={{ opacity: useTransform(scrollYProgress, [0.55, 0.65, 0.75], [0, 1, 0]) }}
           className="h-screen flex items-center justify-end px-8 md:px-32"
@@ -161,29 +169,17 @@ export default function SneakerScroll() {
         </motion.section>
       </div>
 
-      {/* 8. Global CSS */}
-      <style jsx global>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        
-        body {
-          font-family: 'Inter', sans-serif;
-          background-color: #050505;
-          margin: 0;
-        }
-
+      <style>{`
         .text-outline {
           color: transparent;
           -webkit-text-stroke: 1px rgba(255,255,255,0.6);
         }
-
         .italic-bold {
           font-style: italic;
           -webkit-font-smoothing: antialiased;
         }
-
-        ::-webkit-scrollbar {
-          display: none;
-        }
+        body { background-color: #050505; margin: 0; }
+        ::-webkit-scrollbar { display: none; }
       `}</style>
     </div>
   )
