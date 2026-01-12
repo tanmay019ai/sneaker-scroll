@@ -84,7 +84,7 @@ export default function App() {
       <section className="bg-[#050505] py-32 md:py-48 border-t border-white/5">
         <div className="max-w-[1400px] mx-auto px-6">
           <p className="text-white/20 text-[10px] tracking-[0.8em] mb-24 text-center uppercase">
-            Official Technical Partners
+            Official Technical Partners:
           </p>
 
           <div className="grid invert grid-cols-2 md:grid-cols-4 gap-12 md:gap-24 opacity-30 hover:opacity-100 transition-opacity duration-1000">
