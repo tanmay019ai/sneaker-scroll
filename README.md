@@ -3,4 +3,5 @@ Ultra smooth cinematic product animation of a premium sneaker. Slow motion rotat
 
 # Tools
 VEO
+
 I-Frames (For frames)
