@@ -5,3 +5,4 @@ Ultra smooth cinematic product animation of a premium sneaker. Slow motion rotat
 VEO
 
 I-Frames (For frames)
+Integrated using React+vite js
